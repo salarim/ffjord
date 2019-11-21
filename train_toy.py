@@ -25,9 +25,10 @@ from diagnostics.viz_toy import save_trajectory, trajectory_to_video
 SOLVERS = ["dopri5", "bdf", "rk4", "midpoint", 'adams', 'explicit_adams', 'fixed_adams']
 parser = argparse.ArgumentParser('Continuous Normalizing Flow')
 parser.add_argument(
-    '--data', choices=['swissroll', '8gaussians', 'pinwheel', 'circles', 'moons', '2spirals', 'checkerboard', 'rings'],
+    '--data', choices=['swissroll', '8gaussians', 'pinwheel', 'circles', 'moons', '2spirals', 'checkerboard', 'rings', 'gaussians'],
     type=str, default='pinwheel'
 )
+parser.add_argument('--data_labels', type=str, default='8')
 parser.add_argument(
     "--layer_type", type=str, default="concatsquash",
     choices=["ignore", "concat", "concat_v2", "squash", "concatsquash", "concatcoord", "hyper", "blend"]
@@ -109,7 +110,8 @@ def compute_loss(args, model, batch_size=None):
     if batch_size is None: batch_size = args.batch_size
 
     # load data
-    x = toy_data.inf_train_gen(args.data, batch_size=batch_size)
+    data_labels = list(map(int, args.data_labels.split('-')))
+    x, _ = toy_data.inf_train_gen_with_labels(args.data, batch_size=batch_size, labels=data_labels)
     x = torch.from_numpy(x).type(torch.float32).to(device)
     zero = torch.zeros(x.shape[0], 1).to(x)
 

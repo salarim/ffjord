@@ -117,5 +117,42 @@ def inf_train_gen(data, rng=None, batch_size=200):
         x = rng.rand(batch_size) * 5 - 2.5
         y = np.sin(x) * 2.5
         return np.stack((x, y), 1)
-    else:
+    else: 
         return inf_train_gen("8gaussians", rng, batch_size)
+
+import numpy as np
+import sklearn
+import sklearn.datasets
+from sklearn.utils import shuffle as util_shuffle
+
+
+# Dataset iterator with labels
+def inf_train_gen_with_labels(data, rng=None, batch_size=200, labels=[]):
+    if rng is None:
+        rng = np.random.RandomState()
+
+    if data == "gaussians":
+        if len(labels) == 0:
+            labels = [8]
+        scale = 4.
+        dataset = []
+        dataset_labels = []
+        for label in labels:
+            centers = [(np.cos(i*2*np.pi/label),np.sin(i*2*np.pi/label)) for i in range(label)]
+            centers = [(scale * x, scale * y) for x, y in centers]
+
+            for i in range(batch_size//len(labels)):
+                point = rng.randn(2) * np.sin(2*np.pi/label)/2
+                idx = rng.randint(label)
+                center = centers[idx]
+                point[0] += center[0]
+                point[1] += center[1]
+                dataset.append(point)
+                dataset_labels.append(label)
+
+        dataset = np.array(dataset, dtype="float32")
+        dataset /= 1.414
+        dataset_labels = np.array(dataset_labels, dtype="long")
+        return dataset, dataset_labels
+    else: 
+        return inf_train_gen_with_labels("gaussians", rng, batch_size)
