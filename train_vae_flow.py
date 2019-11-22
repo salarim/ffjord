@@ -28,7 +28,7 @@ SOLVERS = ["dopri5", "bdf", "rk4", "midpoint", 'adams', 'explicit_adams', 'fixed
 parser = argparse.ArgumentParser(description='PyTorch Sylvester Normalizing flows')
 
 parser.add_argument(
-    '-d', '--dataset', type=str, default='mnist', choices=['mnist', 'freyfaces', 'omniglot', 'caltech'],
+    '-d', '--dataset', type=str, default='mnist', choices=['mnist', 'freyfaces', 'omniglot', 'caltech', 'mymnist'],
     metavar='DATASET', help='Dataset choice.'
 )
 
@@ -131,6 +131,8 @@ parser.add_argument('--evaluate', type=eval, default=False, choices=[True, False
 parser.add_argument('--model_path', type=str, default='')
 parser.add_argument('--retrain_encoder', type=eval, default=False, choices=[True, False])
 
+parser.add_argument('--conditional', type=eval, default=False, choices=[True, False])
+
 args = parser.parse_args()
 args.cuda = not args.no_cuda and torch.cuda.is_available()
 
@@ -143,6 +145,7 @@ np.random.seed(args.manual_seed)
 if args.cuda:
     # gpu device number
     torch.cuda.set_device(args.gpu_num)
+args.device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 
 kwargs = {'num_workers': 0, 'pin_memory': True} if args.cuda else {}
 
@@ -344,13 +347,13 @@ def run(args, kwargs):
         logger.info(f"Loading model from {args.model_path}")
         final_model = torch.load(args.model_path)
 
-    test_loss, test_bpd = evaluate(test_loader, final_model, args, logger, testing=True)
+    # test_loss, test_bpd = evaluate(test_loader, final_model, args, logger, testing=True)
 
-    logger.info('FINAL EVALUATION ON VALIDATION SET. ELBO (VAL): {:.4f}'.format(validation_loss))
-    logger.info('FINAL EVALUATION ON TEST SET. NLL (TEST): {:.4f}'.format(test_loss))
-    if args.input_type != 'binary':
-        logger.info('FINAL EVALUATION ON VALIDATION SET. ELBO (VAL) BPD : {:.4f}'.format(validation_bpd))
-        logger.info('FINAL EVALUATION ON TEST SET. NLL (TEST) BPD: {:.4f}'.format(test_bpd))
+    # logger.info('FINAL EVALUATION ON VALIDATION SET. ELBO (VAL): {:.4f}'.format(validation_loss))
+    # logger.info('FINAL EVALUATION ON TEST SET. NLL (TEST): {:.4f}'.format(test_loss))
+    # if args.input_type != 'binary':
+    #     logger.info('FINAL EVALUATION ON VALIDATION SET. ELBO (VAL) BPD : {:.4f}'.format(validation_bpd))
+    #     logger.info('FINAL EVALUATION ON TEST SET. NLL (TEST) BPD: {:.4f}'.format(test_bpd))
 
 
 if __name__ == "__main__":

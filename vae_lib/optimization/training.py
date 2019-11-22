@@ -22,9 +22,10 @@ def train(epoch, train_loader, model, opt, args, logger):
     beta = min([(epoch * 1.) / max([args.warmup, 1.]), args.max_beta])
     logger.info('beta = {:5.4f}'.format(beta))
     end = time.time()
-    for batch_idx, (data, _) in enumerate(train_loader):
+    for batch_idx, (data, target) in enumerate(train_loader):
         if args.cuda:
             data = data.cuda()
+            target = target.cuda()
 
         if args.dynamic_binarization:
             data = torch.bernoulli(data)
@@ -32,7 +33,11 @@ def train(epoch, train_loader, model, opt, args, logger):
         data = data.view(-1, *args.input_size)
 
         opt.zero_grad()
-        x_mean, z_mu, z_var, ldj, z0, zk = model(data)
+        
+        if args.conditional:
+            x_mean, z_mu, z_var, ldj, z0, zk = model(data, target)
+        else:
+            x_mean, z_mu, z_var, ldj, z0, zk = model(data)
 
         if 'cnf' in args.flow:
             f_nfe = count_nfe(model)
@@ -102,16 +107,20 @@ def evaluate(data_loader, model, args, logger, testing=False, epoch=0):
     if testing and 'cnf' in args.flow:
         override_divergence_fn(model, "brute_force")
 
-    for data, _ in data_loader:
+    for data, target in data_loader:
         batch_idx += 1
 
         if args.cuda:
             data = data.cuda()
+            target = target.cuda()
 
         with torch.no_grad():
             data = data.view(-1, *args.input_size)
-
-            x_mean, z_mu, z_var, ldj, z0, zk = model(data)
+            
+            if args.conditional:
+                x_mean, z_mu, z_var, ldj, z0, zk = model(data, target)
+            else:
+                x_mean, z_mu, z_var, ldj, z0, zk = model(data)
 
             batch_loss, rec, kl, batch_bpd = calculate_loss(x_mean, data, z_mu, z_var, z0, zk, ldj, args)
 

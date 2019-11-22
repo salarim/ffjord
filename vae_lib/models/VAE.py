@@ -6,6 +6,13 @@ import vae_lib.models.flows as flows
 from vae_lib.models.layers import GatedConv2d, GatedConvTranspose2d
 
 
+def to_onehot(labels, num_classes, device):
+
+    labels_onehot = torch.zeros(labels.size()[0], num_classes).to(device)
+    labels_onehot.scatter_(1, labels.view(-1, 1), 1)
+
+    return labels_onehot
+
 class VAE(nn.Module):
     """
     The base VAE class containing gated convolutional encoder and decoder architecture.
@@ -14,6 +21,10 @@ class VAE(nn.Module):
 
     def __init__(self, args):
         super(VAE, self).__init__()
+
+        self.conditional = args.conditional
+        self.device = args.device
+        self.num_labels = args.num_labels if self.conditional else 0
 
         # extract model settings from args
         self.z_size = args.z_size
@@ -49,7 +60,7 @@ class VAE(nn.Module):
 
         if self.input_type == 'binary':
             q_z_nn = nn.Sequential(
-                GatedConv2d(self.input_size[0], 32, 5, 1, 2),
+                GatedConv2d(self.input_size[0]+self.num_labels, 32, 5, 1, 2),
                 GatedConv2d(32, 32, 5, 2, 2),
                 GatedConv2d(32, 64, 5, 1, 2),
                 GatedConv2d(64, 64, 5, 2, 2),
@@ -67,7 +78,7 @@ class VAE(nn.Module):
             act = None
 
             q_z_nn = nn.Sequential(
-                GatedConv2d(self.input_size[0], 32, 5, 1, 2, activation=act),
+                GatedConv2d(self.input_size[0]+self.num_labels, 32, 5, 1, 2, activation=act),
                 GatedConv2d(32, 32, 5, 2, 2, activation=act),
                 GatedConv2d(32, 64, 5, 1, 2, activation=act),
                 GatedConv2d(64, 64, 5, 2, 2, activation=act),
@@ -87,7 +98,7 @@ class VAE(nn.Module):
 
         if self.input_type == 'binary':
             p_x_nn = nn.Sequential(
-                GatedConvTranspose2d(self.z_size, 64, self.last_kernel_size, 1, 0),
+                GatedConvTranspose2d(self.z_size+self.num_labels, 64, self.last_kernel_size, 1, 0),
                 GatedConvTranspose2d(64, 64, 5, 1, 2),
                 GatedConvTranspose2d(64, 32, 5, 2, 2, 1),
                 GatedConvTranspose2d(32, 32, 5, 1, 2),
@@ -100,7 +111,7 @@ class VAE(nn.Module):
         elif self.input_type == 'multinomial':
             act = None
             p_x_nn = nn.Sequential(
-                GatedConvTranspose2d(self.z_size, 64, self.last_kernel_size, 1, 0, activation=act),
+                GatedConvTranspose2d(self.z_size+self.num_labels, 64, self.last_kernel_size, 1, 0, activation=act),
                 GatedConvTranspose2d(64, 64, 5, 1, 2, activation=act),
                 GatedConvTranspose2d(64, 32, 5, 2, 2, 1, activation=act),
                 GatedConvTranspose2d(32, 32, 5, 1, 2, activation=act),
@@ -131,11 +142,21 @@ class VAE(nn.Module):
 
         return z
 
-    def encode(self, x):
+    def encode(self, x, targets):
         """
         Encoder expects following data shapes as input: shape = (batch_size, num_channels, width, height)
         """
-
+        if self.conditional:
+            onehot_targets = to_onehot(targets, self.num_labels, self.device)
+            onehot_targets = onehot_targets.view(-1, self.num_labels, 1, 1)
+            
+            ones = torch.ones(x.size()[0], 
+                            self.num_labels,
+                            x.size()[2], 
+                            x.size()[3], 
+                            dtype=x.dtype).to(self.device)
+            ones = ones * onehot_targets
+            x = torch.cat((x, ones), dim=1)
         h = self.q_z_nn(x)
         h = h.view(h.size(0), -1)
         mean = self.q_z_mean(h)
@@ -143,29 +164,32 @@ class VAE(nn.Module):
 
         return mean, var
 
-    def decode(self, z):
+    def decode(self, z, targets):
         """
         Decoder outputs reconstructed image in the following shapes:
         x_mean.shape = (batch_size, num_channels, width, height)
         """
+        if self.conditional:
+            onehot_targets = to_onehot(targets, self.num_labels, self.device)
+            z = torch.cat((z, onehot_targets), dim=1)  
 
-        z = z.view(z.size(0), self.z_size, 1, 1)
+        z = z.view(z.size(0), z.size(1), 1, 1)
         h = self.p_x_nn(z)
         x_mean = self.p_x_mean(h)
 
         return x_mean
 
-    def forward(self, x):
+    def forward(self, x, targets=None):
         """
         Evaluates the model as a whole, encodes and decodes. Note that the log det jacobian is zero
          for a plain VAE (without flows), and z_0 = z_k.
         """
 
         # mean and variance of z
-        z_mu, z_var = self.encode(x)
+        z_mu, z_var = self.encode(x, targets)
         # sample z
         z = self.reparameterize(z_mu, z_var)
-        x_mean = self.decode(z)
+        x_mean = self.decode(z, targets)
 
         return x_mean, z_mu, z_var, self.log_det_j, z, z
 

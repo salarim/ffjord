@@ -2,6 +2,9 @@ from __future__ import print_function
 
 import torch
 import torch.utils.data as data_utils
+from torchvision import datasets
+from torchvision import transforms
+from torch.utils.data import DataLoader
 import pickle
 from scipy.io import loadmat
 
@@ -188,6 +191,33 @@ def load_caltech101silhouettes(args, **kwargs):
     return train_loader, val_loader, test_loader, args
 
 
+def load_mymnist(args, **kwargs):
+    args.dynamic_binarization = False
+    args.input_type = 'binary'
+    args.input_size = [1, 28, 28]
+    args.num_labels = 10
+
+    train_dataset = datasets.MNIST(root='data', 
+                               train=True, 
+                               transform=transforms.ToTensor(),
+                               download=True)
+
+    test_dataset = datasets.MNIST(root='data', 
+                                train=False, 
+                                transform=transforms.ToTensor())
+
+
+    train_loader = DataLoader(dataset=train_dataset, 
+                            batch_size=args.batch_size, 
+                            shuffle=True)
+
+    test_loader = DataLoader(dataset=test_dataset, 
+                            batch_size=args.batch_size, 
+                            shuffle=False)
+
+    return train_loader, test_loader, test_loader, args
+
+
 def load_dataset(args, **kwargs):
 
     if args.dataset == 'mnist':
@@ -199,6 +229,8 @@ def load_dataset(args, **kwargs):
         train_loader, val_loader, test_loader, args = load_freyfaces(args, **kwargs)
     elif args.dataset == 'omniglot':
         train_loader, val_loader, test_loader, args = load_omniglot(args, **kwargs)
+    elif args.dataset == 'mymnist':
+        train_loader, val_loader, test_loader, args = load_mymnist(args, **kwargs)
     else:
         raise Exception('Wrong name of the dataset!')
 
