@@ -219,10 +219,22 @@ class PlanarVAE(VAE):
             flow_k = flow()
             self.add_module('flow_' + str(k), flow_k)
 
-    def encode(self, x):
+    def encode(self, x, targets):
         """
         Encoder that ouputs parameters for base distribution of z and flow parameters.
         """
+
+        if self.conditional:
+            onehot_targets = to_onehot(targets, self.num_labels, self.device)
+            onehot_targets = onehot_targets.view(-1, self.num_labels, 1, 1)
+            
+            ones = torch.ones(x.size()[0], 
+                            self.num_labels,
+                            x.size()[2], 
+                            x.size()[3], 
+                            dtype=x.dtype).to(self.device)
+            ones = ones * onehot_targets
+            x = torch.cat((x, ones), dim=1)
 
         batch_size = x.size(0)
 
@@ -238,7 +250,7 @@ class PlanarVAE(VAE):
 
         return mean_z, var_z, u, w, b
 
-    def forward(self, x):
+    def forward(self, x, targets=None):
         """
         Forward pass with planar flows for the transformation z_0 -> z_1 -> ... -> z_k.
         Log determinant is computed as log_det_j = N E_q_z0[\sum_k log |det dz_k/dz_k-1| ].
@@ -246,7 +258,7 @@ class PlanarVAE(VAE):
 
         self.log_det_j = 0.
 
-        z_mu, z_var, u, w, b = self.encode(x)
+        z_mu, z_var, u, w, b = self.encode(x, targets)
 
         # Sample z_0
         z = [self.reparameterize(z_mu, z_var)]
@@ -258,7 +270,7 @@ class PlanarVAE(VAE):
             z.append(z_k)
             self.log_det_j += log_det_jacobian
 
-        x_mean = self.decode(z[-1])
+        x_mean = self.decode(z[-1], targets)
 
         return x_mean, z_mu, z_var, self.log_det_j, z[0], z[-1]
 
@@ -369,10 +381,21 @@ class OrthogonalSylvesterVAE(VAE):
 
         return amat
 
-    def encode(self, x):
+    def encode(self, x, targets):
         """
         Encoder that ouputs parameters for base distribution of z and flow parameters.
         """
+        if self.conditional:
+            onehot_targets = to_onehot(targets, self.num_labels, self.device)
+            onehot_targets = onehot_targets.view(-1, self.num_labels, 1, 1)
+            
+            ones = torch.ones(x.size()[0], 
+                            self.num_labels,
+                            x.size()[2], 
+                            x.size()[3], 
+                            dtype=x.dtype).to(self.device)
+            ones = ones * onehot_targets
+            x = torch.cat((x, ones), dim=1)
 
         batch_size = x.size(0)
 
@@ -405,7 +428,7 @@ class OrthogonalSylvesterVAE(VAE):
 
         return mean_z, var_z, r1, r2, q, b
 
-    def forward(self, x):
+    def forward(self, x, targets=None):
         """
         Forward pass with orthogonal sylvester flows for the transformation z_0 -> z_1 -> ... -> z_k.
         Log determinant is computed as log_det_j = N E_q_z0[\sum_k log |det dz_k/dz_k-1| ].
@@ -413,7 +436,7 @@ class OrthogonalSylvesterVAE(VAE):
 
         self.log_det_j = 0.
 
-        z_mu, z_var, r1, r2, q, b = self.encode(x)
+        z_mu, z_var, r1, r2, q, b = self.encode(x, targets)
 
         # Orthogonalize all q matrices
         q_ortho = self.batch_construct_orthogonal(q)
@@ -430,7 +453,7 @@ class OrthogonalSylvesterVAE(VAE):
             z.append(z_k)
             self.log_det_j += log_det_jacobian
 
-        x_mean = self.decode(z[-1])
+        x_mean = self.decode(z[-1], targets)
 
         return x_mean, z_mu, z_var, self.log_det_j, z[0], z[-1]
 
@@ -521,10 +544,22 @@ class HouseholderSylvesterVAE(VAE):
 
         return amat
 
-    def encode(self, x):
+    def encode(self, x, targets):
         """
         Encoder that ouputs parameters for base distribution of z and flow parameters.
         """
+
+        if self.conditional:
+            onehot_targets = to_onehot(targets, self.num_labels, self.device)
+            onehot_targets = onehot_targets.view(-1, self.num_labels, 1, 1)
+            
+            ones = torch.ones(x.size()[0], 
+                            self.num_labels,
+                            x.size()[2], 
+                            x.size()[3], 
+                            dtype=x.dtype).to(self.device)
+            ones = ones * onehot_targets
+            x = torch.cat((x, ones), dim=1)
 
         batch_size = x.size(0)
 
@@ -557,7 +592,7 @@ class HouseholderSylvesterVAE(VAE):
 
         return mean_z, var_z, r1, r2, q, b
 
-    def forward(self, x):
+    def forward(self, x, targets=None):
         """
         Forward pass with orthogonal flows for the transformation z_0 -> z_1 -> ... -> z_k.
         Log determinant is computed as log_det_j = N E_q_z0[\sum_k log |det dz_k/dz_k-1| ].
@@ -565,7 +600,7 @@ class HouseholderSylvesterVAE(VAE):
 
         self.log_det_j = 0.
 
-        z_mu, z_var, r1, r2, q, b = self.encode(x)
+        z_mu, z_var, r1, r2, q, b = self.encode(x, targets)
 
         # Orthogonalize all q matrices
         q_ortho = self.batch_construct_orthogonal(q)
@@ -584,7 +619,7 @@ class HouseholderSylvesterVAE(VAE):
             z.append(z_k)
             self.log_det_j += log_det_jacobian
 
-        x_mean = self.decode(z[-1])
+        x_mean = self.decode(z[-1], targets)
 
         return x_mean, z_mu, z_var, self.log_det_j, z[0], z[-1]
 
@@ -639,10 +674,22 @@ class TriangularSylvesterVAE(VAE):
 
             self.add_module('flow_' + str(k), flow_k)
 
-    def encode(self, x):
+    def encode(self, x, targets):
         """
         Encoder that ouputs parameters for base distribution of z and flow parameters.
         """
+
+        if self.conditional:
+            onehot_targets = to_onehot(targets, self.num_labels, self.device)
+            onehot_targets = onehot_targets.view(-1, self.num_labels, 1, 1)
+            
+            ones = torch.ones(x.size()[0], 
+                            self.num_labels,
+                            x.size()[2], 
+                            x.size()[3], 
+                            dtype=x.dtype).to(self.device)
+            ones = ones * onehot_targets
+            x = torch.cat((x, ones), dim=1)
 
         batch_size = x.size(0)
 
@@ -673,7 +720,7 @@ class TriangularSylvesterVAE(VAE):
 
         return mean_z, var_z, r1, r2, b
 
-    def forward(self, x):
+    def forward(self, x, targets=None):
         """
         Forward pass with orthogonal flows for the transformation z_0 -> z_1 -> ... -> z_k.
         Log determinant is computed as log_det_j = N E_q_z0[\sum_k log |det dz_k/dz_k-1| ].
@@ -681,7 +728,7 @@ class TriangularSylvesterVAE(VAE):
 
         self.log_det_j = 0.
 
-        z_mu, z_var, r1, r2, b = self.encode(x)
+        z_mu, z_var, r1, r2, b = self.encode(x, targets)
 
         # Sample z_0
         z = [self.reparameterize(z_mu, z_var)]
@@ -701,7 +748,7 @@ class TriangularSylvesterVAE(VAE):
             z.append(z_k)
             self.log_det_j += log_det_jacobian
 
-        x_mean = self.decode(z[-1])
+        x_mean = self.decode(z[-1], targets)
 
         return x_mean, z_mu, z_var, self.log_det_j, z[0], z[-1]
 
@@ -726,10 +773,21 @@ class IAFVAE(VAE):
             z_size=self.z_size, num_flows=self.num_flows, num_hidden=1, h_size=self.h_size, conv2d=False
         )
 
-    def encode(self, x):
+    def encode(self, x, targets):
         """
         Encoder that ouputs parameters for base distribution of z and context h for flows.
         """
+        if self.conditional:
+            onehot_targets = to_onehot(targets, self.num_labels, self.device)
+            onehot_targets = onehot_targets.view(-1, self.num_labels, 1, 1)
+            
+            ones = torch.ones(x.size()[0], 
+                            self.num_labels,
+                            x.size()[2], 
+                            x.size()[3], 
+                            dtype=x.dtype).to(self.device)
+            ones = ones * onehot_targets
+            x = torch.cat((x, ones), dim=1)
 
         h = self.q_z_nn(x)
         h = h.view(-1, self.q_z_nn_output_dim)
@@ -739,14 +797,14 @@ class IAFVAE(VAE):
 
         return mean_z, var_z, h_context
 
-    def forward(self, x):
+    def forward(self, x, targets=None):
         """
         Forward pass with inverse autoregressive flows for the transformation z_0 -> z_1 -> ... -> z_k.
         Log determinant is computed as log_det_j = N E_q_z0[\sum_k log |det dz_k/dz_k-1| ].
         """
 
         # mean and variance of z
-        z_mu, z_var, h_context = self.encode(x)
+        z_mu, z_var, h_context = self.encode(x, targets)
         # sample z
         z_0 = self.reparameterize(z_mu, z_var)
 
@@ -754,6 +812,6 @@ class IAFVAE(VAE):
         z_k, self.log_det_j = self.flow(z_0, h_context)
 
         # decode
-        x_mean = self.decode(z_k)
+        x_mean = self.decode(z_k, targets)
 
         return x_mean, z_mu, z_var, self.log_det_j, z_0, z_k
