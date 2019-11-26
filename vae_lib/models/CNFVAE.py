@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 from train_misc import build_model_tabular
 import lib.layers as layers
-from .VAE import VAE
+from .VAE import VAE, to_onehot
 import lib.layers.diffeq_layers as diffeq_layers
 from lib.layers.odefunc import NONLINEARITIES
 
@@ -28,10 +28,22 @@ class CNFVAE(VAE):
         if args.cuda:
             self.cuda()
 
-    def encode(self, x):
+    def encode(self, x, targets):
         """
         Encoder that ouputs parameters for base distribution of z and flow parameters.
         """
+
+        if self.conditional:
+            onehot_targets = to_onehot(targets, self.num_labels, self.device)
+            onehot_targets = onehot_targets.view(-1, self.num_labels, 1, 1)
+            
+            ones = torch.ones(x.size()[0], 
+                            self.num_labels,
+                            x.size()[2], 
+                            x.size()[3], 
+                            dtype=x.dtype).to(self.device)
+            ones = ones * onehot_targets
+            x = torch.cat((x, ones), dim=1)
 
         h = self.q_z_nn(x)
         h = h.view(-1, self.q_z_nn_output_dim)
@@ -40,13 +52,13 @@ class CNFVAE(VAE):
 
         return mean_z, var_z
 
-    def forward(self, x):
+    def forward(self, x, targets=None):
         """
         Forward pass with planar flows for the transformation z_0 -> z_1 -> ... -> z_k.
         Log determinant is computed as log_det_j = N E_q_z0[\sum_k log |det dz_k/dz_k-1| ].
         """
 
-        z_mu, z_var = self.encode(x)
+        z_mu, z_var = self.encode(x, targets)
 
         # Sample z_0
         z0 = self.reparameterize(z_mu, z_var)
@@ -54,7 +66,7 @@ class CNFVAE(VAE):
         zero = torch.zeros(x.shape[0], 1).to(x)
         zk, delta_logp = self.cnf(z0, zero)  # run model forward
 
-        x_mean = self.decode(zk)
+        x_mean = self.decode(zk, targets)
 
         return x_mean, z_mu, z_var, -delta_logp.view(-1), z0, zk
 
