@@ -129,7 +129,7 @@ def evaluate(data_loader, model, args, logger, testing=False, epoch=0):
 
             # PRINT RECONSTRUCTIONS
             if batch_idx == 1 and testing is False:
-                plot_reconstructions(data, x_mean, batch_loss, loss_type, epoch, args)
+                # plot_reconstructions(data, x_mean, batch_loss, loss_type, epoch, args)
                 
                 normal_sample = torch.FloatTensor(9 * args.z_size).normal_().reshape(9,-1).to(args.device)
                 if args.conditional:
@@ -137,7 +137,7 @@ def evaluate(data_loader, model, args, logger, testing=False, epoch=0):
                     sample = model.decode(normal_sample, tgt)
                 else:
                     sample = model.decode(normal_sample)
-                plot_images(args, sample.data.cpu().numpy(), args.snap_dir + 'reconstruction/', 'sample_of_1_e_'+str(epoch))
+                # plot_images(args, sample.data.cpu().numpy(), args.snap_dir + 'reconstruction/', 'sample_of_1_e_'+str(epoch))
 
     loss /= len(data_loader)
     bpd /= len(data_loader)

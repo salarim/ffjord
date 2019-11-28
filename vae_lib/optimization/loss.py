@@ -53,6 +53,36 @@ def binary_loss_function(recon_x, x, z_mu, z_var, z_0, z_k, ldj, beta=1.):
     return loss, bce, kl
 
 
+def regression_loss_function(recon_x, x, z_mu, z_var, z_0, z_k, ldj, beta=1.):
+
+    reconstruction_function = nn.MSELoss()
+
+    batch_size = x.size(0)
+
+    # - N E_q0 [ ln p(x|z_k) ]
+    reg_loss = reconstruction_function(recon_x, x)
+
+    # ln p(z_k)  (not averaged)
+    log_p_zk = log_normal_standard(z_k, dim=1)
+    # ln q(z_0)  (not averaged)
+    log_q_z0 = log_normal_diag(z_0, mean=z_mu, log_var=z_var.log(), dim=1)
+    # N E_q0[ ln q(z_0) - ln p(z_k) ]
+    summed_logs = torch.sum(log_q_z0 - log_p_zk)
+
+    # sum over batches
+    summed_ldj = torch.sum(ldj)
+
+    # ldj = N E_q_z0[\sum_k log |det dz_k/dz_k-1| ]
+    kl = (summed_logs - summed_ldj)
+    loss = reg_loss + beta * kl
+
+    loss /= float(batch_size)
+    reg_loss /= float(batch_size)
+    kl /= float(batch_size)
+
+    return loss, reg_loss, kl
+
+
 def multinomial_loss_function(x_logit, x, z_mu, z_var, z_0, z_k, ldj, args, beta=1.):
     """
     Computes the cross entropy loss function while summing over batch dimension, not averaged!
@@ -256,10 +286,13 @@ def calculate_loss(x_mean, x, z_mu, z_var, z_0, z_k, ldj, args, beta=1.):
         loss, rec, kl = binary_loss_function(x_mean, x, z_mu, z_var, z_0, z_k, ldj, beta=beta)
         bpd = 0.
 
-    elif args.input_type == 'multinomial' or args.input_type == 'synthetic':
+    elif args.input_type == 'multinomial':
         loss, rec, kl = multinomial_loss_function(x_mean, x, z_mu, z_var, z_0, z_k, ldj, args, beta=beta)
         bpd = loss.data[0] / (np.prod(args.input_size) * np.log(2.))
 
+    elif args.input_type == 'synthetic':
+        loss, rec, kl = regression_loss_function(x_mean, x, z_mu, z_var, z_0, z_k, ldj, beta=beta)
+        bpd = 0.
     else:
         raise ValueError('Invalid input type for calculate loss: %s.' % args.input_type)
 

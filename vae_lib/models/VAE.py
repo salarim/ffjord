@@ -91,7 +91,7 @@ class VAE(nn.Module):
             hidden_size = 5
             q_z_nn = nn.Sequential(nn.Linear(self.input_size[0]+self.num_labels, hidden_size), nn.ReLU())
             q_z_mean = nn.Linear(hidden_size, self.z_size)
-            q_z_var = nn.Linear(hidden_size, self.z_size)
+            q_z_var = nn.Sequential(nn.Linear(hidden_size, self.z_size), nn.Softplus(), nn.Hardtanh(min_val=0.01, max_val=7.)) 
             return q_z_nn, q_z_mean, q_z_var
 
     def create_decoder(self):
@@ -153,8 +153,8 @@ class VAE(nn.Module):
          reparameterization trick.
         """
 
-        # std = var.sqrt()
-        std = logvar.mul(0.5).exp_()
+        std = logvar.sqrt()
+        # std = logvar.mul(0.5).exp_()
         eps = self.FloatTensor(std.size()).normal_()
         z = eps.mul(std).add_(mu)
         return z
