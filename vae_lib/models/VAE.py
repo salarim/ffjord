@@ -35,8 +35,6 @@ class VAE(nn.Module):
             self.last_kernel_size = 7
         elif self.input_size == [1, 28, 20]:
             self.last_kernel_size = (7, 5)
-        else:
-            raise ValueError('invalid input size!!')
 
         self.q_z_nn, self.q_z_mean, self.q_z_var = self.create_encoder()
         self.p_x_nn, self.p_x_mean = self.create_decoder()
@@ -88,6 +86,13 @@ class VAE(nn.Module):
             q_z_mean = nn.Linear(256, self.z_size)
             q_z_var = nn.Sequential(nn.Linear(256, self.z_size), nn.Softplus(), nn.Hardtanh(min_val=0.01, max_val=7.))
             return q_z_nn, q_z_mean, q_z_var
+        
+        elif self.input_type == 'synthetic':
+            hidden_size = 5
+            q_z_nn = nn.Sequential(nn.Linear(self.input_size[0]+self.num_labels, hidden_size), nn.ReLU())
+            q_z_mean = nn.Linear(hidden_size, self.z_size)
+            q_z_var = nn.Linear(hidden_size, self.z_size)
+            return q_z_nn, q_z_mean, q_z_var
 
     def create_decoder(self):
         """
@@ -126,28 +131,38 @@ class VAE(nn.Module):
             )
 
             return p_x_nn, p_x_mean
+        
+        elif self.input_type == 'synthetic':
+            hidden_size = 5
+            p_x_nn = nn.Sequential(
+                nn.Linear(self.z_size+self.num_labels, hidden_size),
+                nn.ReLU()
+            )
+            p_x_mean = nn.Sequential(
+                nn.Linear(hidden_size, self.input_size[0]),
+                nn.Sigmoid()
+            )
+            return p_x_nn, p_x_mean
 
         else:
             raise ValueError('invalid input type!!')
 
-    def reparameterize(self, mu, var):
+    def reparameterize(self, mu, logvar):
         """
         Samples z from a multivariate Gaussian with diagonal covariance matrix using the
          reparameterization trick.
         """
 
-        std = var.sqrt()
+        # std = var.sqrt()
+        std = logvar.mul(0.5).exp_()
         eps = self.FloatTensor(std.size()).normal_()
         z = eps.mul(std).add_(mu)
-
         return z
 
-    def encode(self, x, targets):
-        """
-        Encoder expects following data shapes as input: shape = (batch_size, num_channels, width, height)
-        """
-        if self.conditional:
-            onehot_targets = to_onehot(targets, self.num_labels, self.device)
+    def get_concat_targets(self, x, targets, mode, device):
+
+        onehot_targets = to_onehot(targets, self.num_labels, self.device)
+        if mode == 'binary' or mode == 'multinomial':
             onehot_targets = onehot_targets.view(-1, self.num_labels, 1, 1)
             
             ones = torch.ones(x.size()[0], 
@@ -157,7 +172,20 @@ class VAE(nn.Module):
                             dtype=x.dtype).to(self.device)
             ones = ones * onehot_targets
             x = torch.cat((x, ones), dim=1)
+        elif mode == 'synthetic':
+            x = torch.cat((x, onehot_targets), dim=1)
+        return x
+
+    def encode(self, x, targets):
+        """
+        Encoder expects following data shapes as input: shape = (batch_size, num_channels, width, height)
+        """
+        if self.conditional:
+            x = self.get_concat_targets(x, targets, self.input_type, self.device)
         h = self.q_z_nn(x)
+        # print("Params: ", self.q_z_nn.parameters().__next__())
+        # print('x:', x)
+        # print('h:', h)
         h = h.view(h.size(0), -1)
         mean = self.q_z_mean(h)
         var = self.q_z_var(h)
@@ -173,7 +201,8 @@ class VAE(nn.Module):
             onehot_targets = to_onehot(targets, self.num_labels, self.device)
             z = torch.cat((z, onehot_targets), dim=1)  
 
-        z = z.view(z.size(0), z.size(1), 1, 1)
+        if self.input_type == 'binary' or self.input_type == 'multinomial':
+            z = z.view(z.size(0), z.size(1), 1, 1)
         h = self.p_x_nn(z)
         x_mean = self.p_x_mean(h)
 
@@ -190,7 +219,6 @@ class VAE(nn.Module):
         # sample z
         z = self.reparameterize(z_mu, z_var)
         x_mean = self.decode(z, targets)
-
         return x_mean, z_mu, z_var, self.log_det_j, z, z
 
 

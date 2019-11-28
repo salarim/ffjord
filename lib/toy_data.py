@@ -155,4 +155,4 @@ def inf_train_gen_with_labels(data, rng=None, batch_size=200, labels=[]):
         dataset_labels = np.array(dataset_labels, dtype="long")
         return dataset, dataset_labels
     else: 
-        return inf_train_gen_with_labels("gaussians", rng, batch_size)
+        return inf_train_gen_with_labels("gaussians", rng, batch_size, labels)

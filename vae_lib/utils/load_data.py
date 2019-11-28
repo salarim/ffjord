@@ -196,6 +196,7 @@ def load_mymnist(args, **kwargs):
     args.input_type = 'binary'
     args.input_size = [1, 28, 28]
     args.num_labels = 10
+    args.labels = list(range(10))
 
     train_dataset = datasets.MNIST(root='data', 
                                train=True, 
@@ -218,6 +219,69 @@ def load_mymnist(args, **kwargs):
     return train_loader, test_loader, test_loader, args
 
 
+
+def inf_train_gen_with_labels(data, rng=None, num_samples=200, labels=[]):
+    if rng is None:
+        rng = np.random.RandomState()
+
+    if data == "gaussians":
+        if len(labels) == 0:
+            labels = [8]
+        scale = 4.
+        dataset = []
+        dataset_labels = []
+        for label in labels:
+            centers = [(np.cos(i*2*np.pi/label),np.sin(i*2*np.pi/label)) for i in range(label)]
+            centers = [(scale * x, scale * y) for x, y in centers]
+            for i in range(num_samples//len(labels)):
+                point = rng.randn(2) * np.sin(2*np.pi/label)/2
+                idx = rng.randint(label)
+                center = centers[idx]
+                point[0] += center[0]
+                point[1] += center[1]
+                dataset.append(point)
+                dataset_labels.append(labels.index(label))
+
+        dataset = np.array(dataset, dtype="float32")
+        dataset /= 1.414
+        dataset_labels = np.array(dataset_labels, dtype="long")
+        return dataset, dataset_labels
+    else: 
+        return inf_train_gen_with_labels("gaussians", rng, num_samples, labels)
+
+def load_synthetic(args, **kwargs):
+    
+    from torch.utils.data import Dataset, DataLoader
+
+    class SyntheticData(Dataset):
+        def __init__(self, data_type, num_samples, labels):
+            self.type = data_type
+            self.labels = labels
+            self.num_samples = num_samples
+            self.data, self.data_classes = inf_train_gen_with_labels(data=self.type, num_samples=self.num_samples, labels=self.labels)
+
+        def __len__(self):
+            return self.num_samples
+
+        def __getitem__(self, idx):
+            return self.data[idx], self.data_classes[idx]
+    
+    args.dynamic_binarization = False
+    args.input_type = 'synthetic'
+    args.input_size = [2]
+    args.num_labels = 5
+    
+    labels = [1, 2, 3, 4, 5]
+    train_dataset = SyntheticData(data_type='gaussians', num_samples=500, labels=labels)
+    val_dataset = SyntheticData(data_type='gaussians', num_samples=200, labels=labels)
+    test_dataset = SyntheticData(data_type='gaussians', num_samples=100, labels=labels)
+
+    train_loader = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True, **kwargs)
+    val_loader = DataLoader(val_dataset, batch_size=args.batch_size, shuffle=False, **kwargs)
+    test_loader = DataLoader(test_dataset, batch_size=1, shuffle=False, **kwargs)
+
+    return train_loader, val_loader, test_loader, args
+
 def load_dataset(args, **kwargs):
 
     if args.dataset == 'mnist':
@@ -231,6 +295,8 @@ def load_dataset(args, **kwargs):
         train_loader, val_loader, test_loader, args = load_omniglot(args, **kwargs)
     elif args.dataset == 'mymnist':
         train_loader, val_loader, test_loader, args = load_mymnist(args, **kwargs)
+    elif args.dataset == 'synthetic':
+        train_loader, val_loader, test_loader, args = load_synthetic(args, **kwargs)
     else:
         raise Exception('Wrong name of the dataset!')
 

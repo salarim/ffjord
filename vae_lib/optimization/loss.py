@@ -26,6 +26,10 @@ def binary_loss_function(recon_x, x, z_mu, z_var, z_0, z_k, ldj, beta=1.):
     batch_size = x.size(0)
 
     # - N E_q0 [ ln p(x|z_k) ]
+    # print("*------------------*")
+    # print("Target: ", x)
+    # print("Preds: ", recon_x)
+
     bce = reconstruction_function(recon_x, x)
 
     # ln p(z_k)  (not averaged)
@@ -240,11 +244,19 @@ def calculate_loss(x_mean, x, z_mu, z_var, z_0, z_k, ldj, args, beta=1.):
     Picks the correct loss depending on the input type.
     """
 
+    # print('x_mean:', x_mean)
+    # print('x:', x)
+    # print('z_mu:', z_mu)
+    # print('z_var', z_var)
+    # print('z_0:', z_0)
+    # print('z_k:', z_k)
+    # print('ldj', ldj)
+    # print()
     if args.input_type == 'binary':
         loss, rec, kl = binary_loss_function(x_mean, x, z_mu, z_var, z_0, z_k, ldj, beta=beta)
         bpd = 0.
 
-    elif args.input_type == 'multinomial':
+    elif args.input_type == 'multinomial' or args.input_type == 'synthetic':
         loss, rec, kl = multinomial_loss_function(x_mean, x, z_mu, z_var, z_0, z_k, ldj, args, beta=beta)
         bpd = loss.data[0] / (np.prod(args.input_size) * np.log(2.))
 
