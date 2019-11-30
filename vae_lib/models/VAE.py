@@ -7,9 +7,10 @@ from vae_lib.models.layers import GatedConv2d, GatedConvTranspose2d
 
 
 def to_onehot(labels, num_classes, device):
-
+    
     labels_onehot = torch.zeros(labels.size()[0], num_classes).to(device)
-    labels_onehot.scatter_(1, labels.view(-1, 1), 1)
+    ones = torch.ones(labels.size()[0], 1).to(device)
+    labels_onehot.scatter_(1, labels.view(-1, 1), ones).float()
 
     return labels_onehot
 

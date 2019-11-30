@@ -227,7 +227,7 @@ def inf_train_gen_with_labels(data, rng=None, num_samples=200, labels=[]):
     if data == "gaussians":
         if len(labels) == 0:
             labels = [8]
-        scale = 4.
+        scale = 1.
         dataset = []
         dataset_labels = []
         for label in labels:
@@ -242,9 +242,9 @@ def inf_train_gen_with_labels(data, rng=None, num_samples=200, labels=[]):
                 dataset.append(point)
                 dataset_labels.append(labels.index(label))
 
-        dataset = np.array(dataset, dtype="float32")
+        dataset = torch.tensor(dataset).float()
         dataset /= 1.414
-        dataset_labels = np.array(dataset_labels, dtype="long")
+        dataset_labels = torch.tensor(dataset_labels).long()
         return dataset, dataset_labels
     else: 
         return inf_train_gen_with_labels("gaussians", rng, num_samples, labels)
@@ -272,9 +272,9 @@ def load_synthetic(args, **kwargs):
     args.num_labels = 5
     
     labels = [1, 2, 3, 4, 5]
-    train_dataset = SyntheticData(data_type='gaussians', num_samples=500, labels=labels)
-    val_dataset = SyntheticData(data_type='gaussians', num_samples=200, labels=labels)
-    test_dataset = SyntheticData(data_type='gaussians', num_samples=100, labels=labels)
+    train_dataset = SyntheticData(data_type='gaussians', num_samples=20000, labels=labels)
+    val_dataset = SyntheticData(data_type='gaussians', num_samples=5000, labels=labels)
+    test_dataset = SyntheticData(data_type='gaussians', num_samples=2000, labels=labels)
 
     train_loader = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True, **kwargs)
     val_loader = DataLoader(val_dataset, batch_size=args.batch_size, shuffle=False, **kwargs)

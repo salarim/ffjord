@@ -110,19 +110,18 @@ def evaluate(data_loader, model, args, logger, testing=False, epoch=0):
     for data, target in data_loader:
         batch_idx += 1
 
-        if args.cuda:
-            data = data.cuda()
-            target = target.cuda()
-
         with torch.no_grad():
+            # if args.cuda:
+            #     data.to('cuda')
+            #     target.to('cuda')
             data = data.view(-1, *args.input_size)
             
             if args.conditional:
-                x_mean, z_mu, z_var, ldj, z0, zk = model(data, target)
+                x_mean, z_mu, z_var, ldj, z0, zk = model(data.to('cuda'), target.to('cuda'))
             else:
-                x_mean, z_mu, z_var, ldj, z0, zk = model(data)
+                x_mean, z_mu, z_var, ldj, z0, zk = model(data.to('cuda'))
 
-            batch_loss, rec, kl, batch_bpd = calculate_loss(x_mean, data, z_mu, z_var, z0, zk, ldj, args)
+            batch_loss, rec, kl, batch_bpd = calculate_loss(x_mean, data.to('cuda'), z_mu, z_var, z0, zk, ldj, args)
 
             bpd += batch_bpd
             loss += batch_loss.item()
@@ -131,9 +130,9 @@ def evaluate(data_loader, model, args, logger, testing=False, epoch=0):
             if batch_idx == 1 and testing is False:
                 # plot_reconstructions(data, x_mean, batch_loss, loss_type, epoch, args)
                 
-                normal_sample = torch.FloatTensor(9 * args.z_size).normal_().reshape(9,-1).to(args.device)
+                normal_sample = torch.FloatTensor(args.num_labels * args.z_size).normal_().reshape(args.num_labels,-1).to(args.device)
                 if args.conditional:
-                    tgt = torch.tensor(range(1,10)).to(args.device)
+                    tgt = torch.tensor(list(range(args.num_labels))).to(args.device)
                     sample = model.decode(normal_sample, tgt)
                 else:
                     sample = model.decode(normal_sample)
