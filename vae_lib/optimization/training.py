@@ -5,6 +5,7 @@ import torch
 from vae_lib.optimization.loss import calculate_loss
 from vae_lib.utils.visual_evaluation import plot_reconstructions, plot_images
 from vae_lib.utils.log_likelihood import calculate_likelihood
+from vae_lib.utils.load_data import visualize_synthetic_data
 
 import numpy as np
 from train_misc import count_nfe, override_divergence_fn
@@ -38,7 +39,11 @@ def train(epoch, train_loader, model, opt, args, logger):
             x_mean, z_mu, z_var, ldj, z0, zk = model(data, target)
         else:
             x_mean, z_mu, z_var, ldj, z0, zk = model(data)
-
+        
+        # if batch_idx == len(train_loader)-1:
+        #     print('-'*10 ,)
+        # for i in range(len(x_mean)):
+        #     print(x_mean[i].data[0].item(), x_mean[i].data[1].item(), data[i].data[0].item(), data[i].data[1].item())
         if 'cnf' in args.flow:
             f_nfe = count_nfe(model)
 
@@ -76,7 +81,7 @@ def train(epoch, train_loader, model, opt, args, logger):
                 perc = 100. * batch_idx / len(train_loader)
                 tmp = 'Epoch {:3d} [{:5d}/{:5d} ({:2.0f}%)] | Time {:.3f} | Loss {:11.6f} | Bits/dim {:8.6f}'
                 log_msg = tmp.format(epoch, num_data, len(train_loader.sampler), perc, batch_time, loss.item(),
-                                     bpd), '\trec: {:11.3f}\tkl: {:11.6f}'.format(rec, kl)
+                                     bpd), '\trec: {:11.3f}\tkl: {:11.6f}\tvar: {}'.format(rec, kl, torch.mean(torch.mean(z_var, dim=0)))
                 log_msg = "".join(log_msg)
             if 'cnf' in args.flow:
                 log_msg += ' | NFE Forward {} | NFE Backward {}'.format(f_nfe, b_nfe)
@@ -128,15 +133,24 @@ def evaluate(data_loader, model, args, logger, testing=False, epoch=0):
 
             # PRINT RECONSTRUCTIONS
             if batch_idx == 1 and testing is False:
-                # plot_reconstructions(data, x_mean, batch_loss, loss_type, epoch, args)
-                
-                normal_sample = torch.FloatTensor(args.num_labels * args.z_size).normal_().reshape(args.num_labels,-1).to(args.device)
-                if args.conditional:
-                    tgt = torch.tensor(list(range(args.num_labels))).to(args.device)
-                    sample = model.decode(normal_sample, tgt)
+                if args.input_type == 'synthetic':
+                    sample_size = 500
+                    normal_sample = torch.FloatTensor(sample_size* args.num_labels * args.z_size).normal_().reshape(sample_size*args.num_labels,-1).to(args.device)
+                    if args.conditional:
+                        tgt = torch.tensor(list(range(args.num_labels))*sample_size).to(args.device)
+                        sample = model.decode(normal_sample, tgt)
+                    else:
+                        sample = model.decode(normal_sample, None)
+                    visualize_synthetic_data(sample.cpu().numpy(), tgt.cpu().numpy(), args.num_labels, 'rec')
                 else:
-                    sample = model.decode(normal_sample)
-                # plot_images(args, sample.data.cpu().numpy(), args.snap_dir + 'reconstruction/', 'sample_of_1_e_'+str(epoch))
+                    plot_reconstructions(data, x_mean, batch_loss, loss_type, epoch, args)
+                    normal_sample = torch.FloatTensor(args.num_labels * args.z_size).normal_().reshape(args.num_labels,-1).to(args.device)
+                    if args.conditional:
+                        tgt = torch.tensor(list(range(args.num_labels))).to(args.device)
+                        sample = model.decode(normal_sample, tgt)
+                    else:
+                        sample = model.decode(normal_sample)
+                    plot_images(args, sample.data.cpu().numpy(), args.snap_dir + 'reconstruction/', 'sample_of_1_e_'+str(epoch), size_x=1,size_y=args.num_labels)
 
     loss /= len(data_loader)
     bpd /= len(data_loader)

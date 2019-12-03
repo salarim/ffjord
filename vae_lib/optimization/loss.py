@@ -74,7 +74,7 @@ def regression_loss_function(recon_x, x, z_mu, z_var, z_0, z_k, ldj, beta=1.):
 
     # ldj = N E_q_z0[\sum_k log |det dz_k/dz_k-1| ]
     kl = (summed_logs - summed_ldj)
-    loss = reg_loss + kl
+    loss = reg_loss + beta * kl
 
     loss /= float(batch_size)
     reg_loss /= float(batch_size)

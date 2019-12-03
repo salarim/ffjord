@@ -90,9 +90,12 @@ class VAE(nn.Module):
         
         elif self.input_type == 'synthetic':
             hidden_size = 5
-            q_z_nn = nn.Sequential(nn.Linear(self.input_size[0]+self.num_labels, hidden_size), nn.ReLU())
+            q_z_nn = nn.Sequential(nn.Linear(self.input_size[0]+self.num_labels, hidden_size),
+                                 nn.Tanh(),
+                                 nn.Linear(hidden_size, hidden_size),
+                                 nn.Tanh())
             q_z_mean = nn.Linear(hidden_size, self.z_size)
-            q_z_var = nn.Sequential(nn.Linear(hidden_size, self.z_size), nn.Softplus(), nn.Hardtanh(min_val=0.01, max_val=7.)) 
+            q_z_var = nn.Sequential(nn.Linear(hidden_size, self.z_size), nn.Softplus())#, nn.Hardtanh(min_val=0.01, max_val=7.)) 
             return q_z_nn, q_z_mean, q_z_var
 
     def create_decoder(self):
@@ -137,27 +140,31 @@ class VAE(nn.Module):
             hidden_size = 5
             p_x_nn = nn.Sequential(
                 nn.Linear(self.z_size+self.num_labels, hidden_size),
-                nn.ReLU()
+                nn.Tanh(),
+                nn.Linear(hidden_size, hidden_size),
+                nn.Tanh(),
+                 nn.Linear(hidden_size, hidden_size),
+                nn.Tanh(),
             )
             p_x_mean = nn.Sequential(
-                nn.Linear(hidden_size, self.input_size[0]),
-                nn.Sigmoid()
+                nn.Linear(hidden_size, self.input_size[0])
+                # nn.Sigmoid()
             )
             return p_x_nn, p_x_mean
 
         else:
             raise ValueError('invalid input type!!')
 
-    def reparameterize(self, mu, logvar):
+    def reparameterize(self, mu, var):
         """
         Samples z from a multivariate Gaussian with diagonal covariance matrix using the
          reparameterization trick.
         """
 
-        std = logvar.sqrt()
+        # std = var.sqrt()
         # std = logvar.mul(0.5).exp_()
-        eps = self.FloatTensor(std.size()).normal_()
-        z = eps.mul(std).add_(mu)
+        eps = self.FloatTensor(var.size()).normal_()
+        z = eps.mul(var).add_(mu)
         return z
 
     def get_concat_targets(self, x, targets, mode, device):
@@ -184,9 +191,6 @@ class VAE(nn.Module):
         if self.conditional:
             x = self.get_concat_targets(x, targets, self.input_type, self.device)
         h = self.q_z_nn(x)
-        # print("Params: ", self.q_z_nn.parameters().__next__())
-        # print('x:', x)
-        # print('h:', h)
         h = h.view(h.size(0), -1)
         mean = self.q_z_mean(h)
         var = self.q_z_var(h)
@@ -254,16 +258,7 @@ class PlanarVAE(VAE):
         """
 
         if self.conditional:
-            onehot_targets = to_onehot(targets, self.num_labels, self.device)
-            onehot_targets = onehot_targets.view(-1, self.num_labels, 1, 1)
-            
-            ones = torch.ones(x.size()[0], 
-                            self.num_labels,
-                            x.size()[2], 
-                            x.size()[3], 
-                            dtype=x.dtype).to(self.device)
-            ones = ones * onehot_targets
-            x = torch.cat((x, ones), dim=1)
+            x = self.get_concat_targets(x, targets, self.input_type, self.device)
 
         batch_size = x.size(0)
 
@@ -415,16 +410,7 @@ class OrthogonalSylvesterVAE(VAE):
         Encoder that ouputs parameters for base distribution of z and flow parameters.
         """
         if self.conditional:
-            onehot_targets = to_onehot(targets, self.num_labels, self.device)
-            onehot_targets = onehot_targets.view(-1, self.num_labels, 1, 1)
-            
-            ones = torch.ones(x.size()[0], 
-                            self.num_labels,
-                            x.size()[2], 
-                            x.size()[3], 
-                            dtype=x.dtype).to(self.device)
-            ones = ones * onehot_targets
-            x = torch.cat((x, ones), dim=1)
+            x = self.get_concat_targets(x, targets, self.input_type, self.device)
 
         batch_size = x.size(0)
 
@@ -579,16 +565,7 @@ class HouseholderSylvesterVAE(VAE):
         """
 
         if self.conditional:
-            onehot_targets = to_onehot(targets, self.num_labels, self.device)
-            onehot_targets = onehot_targets.view(-1, self.num_labels, 1, 1)
-            
-            ones = torch.ones(x.size()[0], 
-                            self.num_labels,
-                            x.size()[2], 
-                            x.size()[3], 
-                            dtype=x.dtype).to(self.device)
-            ones = ones * onehot_targets
-            x = torch.cat((x, ones), dim=1)
+            x = self.get_concat_targets(x, targets, self.input_type, self.device)
 
         batch_size = x.size(0)
 
@@ -709,16 +686,7 @@ class TriangularSylvesterVAE(VAE):
         """
 
         if self.conditional:
-            onehot_targets = to_onehot(targets, self.num_labels, self.device)
-            onehot_targets = onehot_targets.view(-1, self.num_labels, 1, 1)
-            
-            ones = torch.ones(x.size()[0], 
-                            self.num_labels,
-                            x.size()[2], 
-                            x.size()[3], 
-                            dtype=x.dtype).to(self.device)
-            ones = ones * onehot_targets
-            x = torch.cat((x, ones), dim=1)
+            x = self.get_concat_targets(x, targets, self.input_type, self.device)
 
         batch_size = x.size(0)
 
@@ -807,16 +775,7 @@ class IAFVAE(VAE):
         Encoder that ouputs parameters for base distribution of z and context h for flows.
         """
         if self.conditional:
-            onehot_targets = to_onehot(targets, self.num_labels, self.device)
-            onehot_targets = onehot_targets.view(-1, self.num_labels, 1, 1)
-            
-            ones = torch.ones(x.size()[0], 
-                            self.num_labels,
-                            x.size()[2], 
-                            x.size()[3], 
-                            dtype=x.dtype).to(self.device)
-            ones = ones * onehot_targets
-            x = torch.cat((x, ones), dim=1)
+            x = self.get_concat_targets(x, targets, self.input_type, self.device)
 
         h = self.q_z_nn(x)
         h = h.view(-1, self.q_z_nn_output_dim)

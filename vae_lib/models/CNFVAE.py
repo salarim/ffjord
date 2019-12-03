@@ -34,16 +34,7 @@ class CNFVAE(VAE):
         """
 
         if self.conditional:
-            onehot_targets = to_onehot(targets, self.num_labels, self.device)
-            onehot_targets = onehot_targets.view(-1, self.num_labels, 1, 1)
-            
-            ones = torch.ones(x.size()[0], 
-                            self.num_labels,
-                            x.size()[2], 
-                            x.size()[3], 
-                            dtype=x.dtype).to(self.device)
-            ones = ones * onehot_targets
-            x = torch.cat((x, ones), dim=1)
+            x = self.get_concat_targets(x, targets, self.input_type, self.device)
 
         h = self.q_z_nn(x)
         h = h.view(-1, self.q_z_nn_output_dim)

@@ -7,6 +7,7 @@ from torchvision import transforms
 from torch.utils.data import DataLoader
 import pickle
 from scipy.io import loadmat
+import matplotlib.pyplot as plt
 
 import numpy as np
 
@@ -234,7 +235,7 @@ def inf_train_gen_with_labels(data, rng=None, num_samples=200, labels=[]):
             centers = [(np.cos(i*2*np.pi/label),np.sin(i*2*np.pi/label)) for i in range(label)]
             centers = [(scale * x, scale * y) for x, y in centers]
             for i in range(num_samples//len(labels)):
-                point = rng.randn(2) * np.sin(2*np.pi/label)/2
+                point = rng.randn(2) * 0.1
                 idx = rng.randint(label)
                 center = centers[idx]
                 point[0] += center[0]
@@ -243,11 +244,22 @@ def inf_train_gen_with_labels(data, rng=None, num_samples=200, labels=[]):
                 dataset_labels.append(labels.index(label))
 
         dataset = torch.tensor(dataset).float()
-        dataset /= 1.414
         dataset_labels = torch.tensor(dataset_labels).long()
+        # dataset -= dataset.min(dim=0)[0]
+        # dataset /= dataset.max(dim=0)[0]
+        visualize_synthetic_data(dataset.numpy(), dataset_labels.numpy(), len(labels), 'org')
         return dataset, dataset_labels
     else: 
         return inf_train_gen_with_labels("gaussians", rng, num_samples, labels)
+
+
+def visualize_synthetic_data(data, labels, labels_num, filename):
+    for i in range(labels_num):
+        new_data = data[labels==i]
+        plt.clf()
+        plt.scatter(new_data[:,0], new_data[:,1])
+        plt.savefig(filename + str(i) + ".png")
+
 
 def load_synthetic(args, **kwargs):
     
@@ -269,9 +281,9 @@ def load_synthetic(args, **kwargs):
     args.dynamic_binarization = False
     args.input_type = 'synthetic'
     args.input_size = [2]
-    args.num_labels = 5
+    args.num_labels = 1
     
-    labels = [1, 2, 3, 4, 5]
+    labels = [2]
     train_dataset = SyntheticData(data_type='gaussians', num_samples=20000, labels=labels)
     val_dataset = SyntheticData(data_type='gaussians', num_samples=5000, labels=labels)
     test_dataset = SyntheticData(data_type='gaussians', num_samples=2000, labels=labels)
