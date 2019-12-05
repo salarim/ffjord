@@ -144,13 +144,14 @@ def evaluate(data_loader, model, args, logger, testing=False, epoch=0):
                     visualize_synthetic_data(sample.cpu().numpy(), tgt.cpu().numpy(), args.num_labels, 'rec')
                 else:
                     plot_reconstructions(data, x_mean, batch_loss, loss_type, epoch, args)
-                    normal_sample = torch.FloatTensor(args.num_labels * args.z_size).normal_().reshape(args.num_labels,-1).to(args.device)
+                    sample_lables_num = args.num_labels - 1
+                    normal_sample = torch.FloatTensor(sample_lables_num * args.z_size).normal_().reshape(sample_lables_num,-1).to(args.device)
                     if args.conditional:
-                        tgt = torch.tensor(list(range(args.num_labels))).to(args.device)
+                        tgt = torch.tensor(list(range(sample_lables_num))).to(args.device)
                         sample = model.decode(normal_sample, tgt)
                     else:
                         sample = model.decode(normal_sample)
-                    plot_images(args, sample.data.cpu().numpy(), args.snap_dir + 'reconstruction/', 'sample_of_1_e_'+str(epoch), size_x=1,size_y=args.num_labels)
+                    plot_images(args, sample.data.cpu().numpy(), args.snap_dir + 'reconstruction/', 'sample_of_1_e_'+str(epoch))
 
     loss /= len(data_loader)
     bpd /= len(data_loader)
