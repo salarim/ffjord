@@ -54,7 +54,7 @@ parser.add_argument(
 
 # optimization settings
 parser.add_argument(
-    '-e', '--epochs', type=int, default=2000, metavar='EPOCHS', help='number of epochs to train (default: 2000)'
+    '-e', '--epochs', type=int, default=100, metavar='EPOCHS', help='number of epochs to train (default: 100)'
 )
 parser.add_argument(
     '-es', '--early_stopping_epochs', type=int, default=35, metavar='EARLY_STOPPING',
@@ -62,7 +62,7 @@ parser.add_argument(
 )
 
 parser.add_argument(
-    '-bs', '--batch_size', type=int, default=100, metavar='BATCH_SIZE', help='input batch size for training'
+    '-bs', '--batch_size', type=int, default=300, metavar='BATCH_SIZE', help='input batch size for training'
 )
 parser.add_argument('-lr', '--learning_rate', type=float, default=0.0005, metavar='LEARNING_RATE', help='learning rate')
 
