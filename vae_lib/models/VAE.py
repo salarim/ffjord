@@ -161,10 +161,9 @@ class VAE(nn.Module):
          reparameterization trick.
         """
 
-        # std = var.sqrt()
-        # std = logvar.mul(0.5).exp_()
-        eps = self.FloatTensor(var.size()).normal_()
-        z = eps.mul(var).add_(mu)
+        std = var.sqrt()
+        eps = self.FloatTensor(std.size()).normal_()
+        z = eps.mul(std).add_(mu)
         return z
 
     def get_concat_targets(self, x, targets, mode, device):

@@ -62,7 +62,7 @@ parser.add_argument(
 )
 
 parser.add_argument(
-    '-bs', '--batch_size', type=int, default=300, metavar='BATCH_SIZE', help='input batch size for training'
+    '-bs', '--batch_size', type=int, default=512, metavar='BATCH_SIZE', help='input batch size for training'
 )
 parser.add_argument('-lr', '--learning_rate', type=float, default=0.0005, metavar='LEARNING_RATE', help='learning rate')
 
@@ -147,7 +147,7 @@ if args.cuda:
     torch.cuda.set_device(args.gpu_num)
 args.device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 
-kwargs = {'num_workers': 0, 'pin_memory': False} if args.cuda else {}
+kwargs = {'num_workers': 6, 'pin_memory': False} if args.cuda else {}
 
 
 def run(args, kwargs):
