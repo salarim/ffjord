@@ -1,6 +1,8 @@
 from __future__ import print_function
 import time
 import torch
+import os
+import matplotlib.pyplot as plt
 
 from vae_lib.optimization.loss import calculate_loss
 from vae_lib.utils.visual_evaluation import plot_reconstructions, plot_images
@@ -142,7 +144,7 @@ def evaluate(data_loader, model, args, logger, testing=False, epoch=0):
                     else:
                         sample = model.decode(normal_sample, None)
                     visualize_synthetic_data(sample.cpu().numpy(), tgt.cpu().numpy(), args.num_labels, 'rec')
-                else:
+                elif not args.evaluate:
                     plot_reconstructions(data, x_mean, batch_loss, loss_type, epoch, args)
                     sample_lables_num = args.num_labels - 1
                     normal_sample = torch.FloatTensor(sample_lables_num * args.z_size).normal_().reshape(sample_lables_num,-1).to(args.device)
@@ -150,8 +152,32 @@ def evaluate(data_loader, model, args, logger, testing=False, epoch=0):
                         tgt = torch.tensor(list(range(sample_lables_num))).to(args.device)
                         sample = model.decode(normal_sample, tgt)
                     else:
-                        sample = model.decode(normal_sample)
+                        sample = model.decode(normal_sample, None)
                     plot_images(args, sample.data.cpu().numpy(), args.snap_dir + 'reconstruction/', 'sample_of_1_e_'+str(epoch))
+                else:
+                    print('###############################')
+                    sample_size = 100
+                    normal_sample = torch.FloatTensor(sample_size * args.num_labels * args.z_size).normal_().reshape(sample_size * args.num_labels,-1).to(args.device)
+                    if args.conditional:
+                        sample_labels = []
+                        for i in range(args.num_labels):
+                            for j in range(sample_size):
+                                sample_labels.append(i)
+                        tgt = torch.tensor(sample_labels).to(args.device)
+                        import cv2
+                        samples = model.decode(normal_sample, tgt)
+                        samples, tgt = samples.data.cpu().numpy(), tgt.data.cpu().numpy()
+                        if not os.path.exists(args.snap_dir + 'samples/'):
+                            os.makedirs(args.snap_dir + 'samples/')
+                        for i, sample in enumerate(samples):
+                            l = tgt[i]
+                            if not os.path.exists(args.snap_dir + 'samples/' + str(l)):
+                                os.makedirs(args.snap_dir + 'samples/' + str(l))
+                            sample = sample.swapaxes(0, 2)
+                            sample = sample.swapaxes(0, 1)
+                            sample = sample * 255
+                            sample = cv2.cvtColor(sample, cv2.COLOR_GRAY2BGR)
+                            cv2.imwrite(args.snap_dir + 'samples/' + str(l) + '/' + str(i) + '.jpg', sample)
 
     loss /= len(data_loader)
     bpd /= len(data_loader)

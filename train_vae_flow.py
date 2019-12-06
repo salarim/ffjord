@@ -346,6 +346,7 @@ def run(args, kwargs):
         validation_bpd = "N/A"
         logger.info(f"Loading model from {args.model_path}")
         final_model = torch.load(args.model_path)
+        test_loss, test_bpd = evaluate(test_loader, final_model, args, logger)
 
     # test_loss, test_bpd = evaluate(test_loader, final_model, args, logger, testing=True)
 
